@@ -91,5 +91,25 @@
     <!-- 引入 Bootstrap JS 和 Popper.js -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        // 定義欄位類型及其可用的運算符
+        const FIELD_OPERATORS = {
+            text: ['EQ'],           // 文字欄位只使用 EQ
+            date: ['EQ', 'GR', 'GE', 'LT', 'LE', 'BETWEEN']  // 日期欄位使用所有日期相關運算符
+        };
+
+        // 獲取運算符顯示文字
+        function getOperatorText(operator) {
+            const operatorTexts = {
+                'EQ': '等於',
+                'GR': '大於',
+                'GE': '大於等於',
+                'LT': '小於',
+                'LE': '小於等於',
+                'BETWEEN': '介於'
+            };
+            return operatorTexts[operator] || operator;
+        }
+    </script>
 </body>
 </html> 

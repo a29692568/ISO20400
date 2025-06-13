@@ -21,10 +21,7 @@ let elements = {
 // 操作符定義（更友善的顯示方式）
 const OPERATOR_DEFINITIONS = {
     text: [
-        { value: 'EQ', label: '等於' },
-        { value: 'NE', label: '不等於' },
-        { value: 'LIKE', label: '包含' },
-        { value: 'NOT_LIKE', label: '不包含' }
+        { value: 'EQ', label: '等於' }
     ],
     date: [
         { value: 'EQ', label: '等於' },
@@ -276,6 +273,57 @@ function showResults(data) {
 }
 
 /**
+ * 更新值輸入容器的函數
+ * @param {HTMLSelectElement} fieldSelect 欄位選擇器
+ * @param {HTMLDivElement} valueContainer 值輸入容器
+ */
+function updateValueContainer(fieldSelect, valueContainer) {
+    const fieldType = FIELD_DEFINITIONS[fieldSelect.value]?.type || 'text';
+    const operatorSelect = fieldSelect.closest('.filter-group').querySelector('.operator-select');
+    const operator = operatorSelect.value;
+
+    // 清空現有內容
+    valueContainer.innerHTML = '';
+
+    if (fieldType === 'date') {
+        if (operator === 'BETWEEN') {
+            // 建立一個 div 作為區間容器
+            const rangeDiv = document.createElement('div');
+            rangeDiv.className = 'date-range';
+
+            const startInput = document.createElement('input');
+            startInput.type = 'date';
+            startInput.className = 'form-control date-range-start';
+            startInput.placeholder = '開始日期';
+
+            const endInput = document.createElement('input');
+            endInput.type = 'date';
+            endInput.className = 'form-control date-range-end';
+            endInput.placeholder = '結束日期';
+
+            rangeDiv.appendChild(startInput);
+            rangeDiv.appendChild(document.createTextNode(' 至 '));
+            rangeDiv.appendChild(endInput);
+
+            valueContainer.appendChild(rangeDiv);
+        } else {
+            // 單一日期輸入
+            const dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            dateInput.className = 'form-control';
+            valueContainer.appendChild(dateInput);
+        }
+    } else {
+        // 文字輸入（只使用 EQ）
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.className = 'form-control';
+        textInput.placeholder = '請輸入搜尋值';
+        valueContainer.appendChild(textInput);
+    }
+}
+
+/**
  * 執行搜尋
  * @param {Object} params 查詢參數
  */
@@ -292,7 +340,7 @@ async function performSearch() {
             
             const field = fieldSelect.value;
             const operator = operatorSelect.value;
-            const fieldType = FIELD_DEFINITIONS[field]?.type;
+            const fieldType = FIELD_DEFINITIONS[field]?.type || 'text';
             
             if (field && operator) {
                 if (fieldType === 'date') {
@@ -310,9 +358,10 @@ async function performSearch() {
                         }
                     }
                 } else {
+                    // 文字欄位只使用 EQ
                     const textInput = valueContainer.querySelector('input[type="text"]');
                     if (textInput?.value) {
-                        filters.push(`${field},${operator},${textInput.value}`);
+                        filters.push(`${field},EQ,${textInput.value}`);
                     }
                 }
             }
@@ -481,26 +530,21 @@ function removeFilterGroup(button) {
     }
 }
 
-// 更新運算符選項
+/**
+ * 更新運算符選項
+ * @param {HTMLSelectElement} select 欄位選擇器
+ */
 function updateOperators(select) {
     const filterGroup = select.closest('.filter-group');
     const operatorSelect = filterGroup.querySelector('.operator-select');
     const valueContainer = filterGroup.querySelector('.value-container');
-    const valueInput = valueContainer.querySelector('input');
+    const fieldType = FIELD_DEFINITIONS[select.value]?.type || 'text';
     
-    // 重置運算符選項
-    operatorSelect.innerHTML = '<option value="">請選擇運算符</option>';
-    operatorSelect.disabled = true;
-    valueInput.disabled = true;
-    valueInput.value = '';
+    // 清空現有選項
+    operatorSelect.innerHTML = '';
     
-    const selectedField = select.value;
-    if (!selectedField) return;
-    
-    const fieldType = FIELD_DEFINITIONS[selectedField].type;
-    const operators = OPERATOR_DEFINITIONS[fieldType] || [];
-    
-    // 更新運算符選項
+    // 根據欄位類型顯示對應的運算符
+    const operators = OPERATOR_DEFINITIONS[fieldType] || OPERATOR_DEFINITIONS.text;
     operators.forEach(op => {
         const option = document.createElement('option');
         option.value = op.value;
@@ -508,45 +552,20 @@ function updateOperators(select) {
         operatorSelect.appendChild(option);
     });
     
-    operatorSelect.disabled = false;
+    // 移除 disabled 屬性
+    operatorSelect.removeAttribute('disabled');
     
-    // 根據運算符類型更新輸入控制項
-    operatorSelect.onchange = function() {
-        updateValueInput(this, fieldType, valueContainer);
-    };
-}
-
-// 更新輸入控制項
-function updateValueInput(operatorSelect, fieldType, valueContainer) {
-    const valueInput = valueContainer.querySelector('input');
-    valueInput.disabled = true;
-    valueInput.value = '';
+    // 移除舊的事件監聽器（如果有的話）
+    const newOperatorSelect = operatorSelect.cloneNode(true);
+    operatorSelect.parentNode.replaceChild(newOperatorSelect, operatorSelect);
     
-    // 移除現有的輸入控制項
-    while (valueContainer.firstChild) {
-        valueContainer.removeChild(valueContainer.firstChild);
-    }
+    // 添加新的事件監聽器
+    newOperatorSelect.addEventListener('change', function() {
+        updateValueContainer(select, valueContainer);
+    });
     
-    const operator = operatorSelect.value;
-    if (!operator) return;
-    
-    if (operator === 'BETWEEN' && fieldType === 'date') {
-        // 日期範圍輸入
-        valueContainer.innerHTML = `
-            <div class="input-group">
-                <input type="date" class="form-control date-range-start" onchange="validateDateRange(this)">
-                <span class="input-group-text">至</span>
-                <input type="date" class="form-control date-range-end" onchange="validateDateRange(this)">
-            </div>
-        `;
-    } else {
-        // 一般輸入
-        const input = document.createElement('input');
-        input.type = fieldType === 'date' ? 'date' : 'text';
-        input.className = 'form-control';
-        input.disabled = false;
-        valueContainer.appendChild(input);
-    }
+    // 更新值輸入容器
+    updateValueContainer(select, valueContainer);
 }
 
 // 初始化欄位說明 Modal

@@ -105,6 +105,7 @@ h1 {
     display: flex;
     gap: 1rem;
     align-items: center;
+    flex-direction: row !important;
 }
 
 .date-range .form-control {
