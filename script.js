@@ -616,9 +616,8 @@ function updateResultTable(records) {
             let value = record[field] || '';
             
             // 格式化日期欄位
-            if (['transgress_date', 'penalty_date'].includes(field) && value) {
-                // 確保日期格式正確顯示
-                value = value.replace(/\//g, '-');  // 將斜線替換為連字符
+            if (["transgress_date", "penalty_date"].includes(field) && value) {
+                value = value.replace(/\//g, '-');
             }
             
             td.textContent = value;
@@ -646,9 +645,9 @@ function updateResultTable(records) {
     });
 }
 
-// 顯示詳細資料
-function showDetail(documentNo) {
-    alert(`顯示文件編號 ${documentNo} 的詳細資料`);
+// 顯示詳細資料（簡單 alert 版）
+function showRecordDetails(record) {
+    alert(JSON.stringify(record, null, 2));
 }
 
 // 確保 DOM 完全載入後才執行初始化
