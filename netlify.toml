@@ -1,0 +1,54 @@
+[build]
+  # 發布目錄
+  publish = "."
+  
+  # Functions 目錄
+  functions = "netlify-functions"
+
+[build.environment]
+  # Node.js 版本
+  NODE_VERSION = "18"
+
+# 路由規則
+[[redirects]]
+  # 將 /api/labor-data/* 路由到 Functions
+  from = "/api/labor-data/*"
+  to = "/.netlify/functions/proxy-labor-data"
+  status = 200
+
+# 健康檢查端點
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health-check"
+  status = 200
+
+# 處理 SPA 路由
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 安全性標頭
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# 快取設定
+[[headers]]
+  for = "/api/labor-data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000" 

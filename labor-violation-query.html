@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>違反勞動法令事業單位（雇主）查詢系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .system-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .query-panel {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .result-info {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .pagination-container {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .pagination .page-link {
+            color: #007bff;
+            border: 1px solid #dee2e6;
+            padding: 0.5rem 0.75rem;
+            margin-left: -1px;
+            line-height: 1.25;
+            background-color: #fff;
+        }
+        
+        .pagination .page-link:hover {
+            color: #0056b3;
+            text-decoration: none;
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        
+        .pagination .page-item.disabled .page-link {
+            color: #6c757d;
+            pointer-events: none;
+            background-color: #fff;
+            border-color: #dee2e6;
+        }
+        
+        .pagination .page-link:focus {
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        
+        .export-buttons {
+            margin-top: 1rem;
+        }
+        
+        .date-range-display {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 系統標題 -->
+    <div class="system-header">
+        <div class="container">
+            <h1 class="text-center mb-0">
+                <i class="bi bi-search"></i>
+                違反勞動法令事業單位（雇主）查詢系統
+            </h1>
+            <p class="text-center mb-0 mt-2 opacity-75">整合勞動基準法、性別工作平等法、最低工資法裁處資料</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 查詢條件面板 -->
+        <div class="query-panel">
+            <h5 class="mb-3">
+                <i class="bi bi-funnel"></i>
+                查詢條件
+            </h5>
+            
+            <!-- 日期範圍顯示 -->
+            <div class="date-range-display">
+                <strong>預設查詢期間：</strong>
+                <span id="dateRangeDisplay">最近一年</span>
+                <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="toggleDateRange()">
+                    <i class="bi bi-calendar"></i> 調整期間
+                </button>
+            </div>
+            
+            <!-- 日期範圍選擇器（預設隱藏） -->
+            <div id="dateRangeSelector" class="row mb-3" style="display: none;">
+                <div class="col-md-6">
+                    <label class="form-label">開始日期</label>
+                    <input type="date" class="form-control" id="startDate">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">結束日期</label>
+                    <input type="date" class="form-control" id="endDate">
+                </div>
+            </div>
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">
+                        <i class="bi bi-building"></i>
+                        事業單位名稱
+                    </label>
+                    <input type="text" class="form-control" id="companyName" 
+                           placeholder="輸入事業單位名稱關鍵字（包含搜尋）">
+                    <div class="form-text">留空則查詢所有事業單位</div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">
+                        <i class="bi bi-geo-alt"></i>
+                        主管機關
+                    </label>
+                    <select class="form-select" id="authority">
+                        <option value="">全部機關</option>
+                        <!-- 動態載入主管機關選項 -->
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">
+                        <i class="bi bi-file-text"></i>
+                        違法法規
+                    </label>
+                    <select class="form-select" id="lawType">
+                        <option value="">全部法規</option>
+                        <option value="勞動基準法">勞動基準法</option>
+                        <option value="性別工作平等法">性別工作平等法</option>
+                        <option value="最低工資法">最低工資法</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label class="form-label">
+                        <i class="bi bi-list-ul"></i>
+                        每頁筆數
+                    </label>
+                    <select class="form-select" id="pageSize">
+                        <option value="20">20筆</option>
+                        <option value="50" selected>50筆</option>
+                        <option value="100">100筆</option>
+                        <option value="200">200筆</option>
+                        <option value="500">500筆</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-3">
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="performSearch()">
+                        <i class="bi bi-search"></i> 查詢
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="resetQuery()">
+                        <i class="bi bi-arrow-clockwise"></i> 重置
+                    </button>
+                </div>
+                <div class="export-buttons">
+                    <button type="button" class="btn btn-success" onclick="exportToCSV()" id="exportCSV" disabled>
+                        <i class="bi bi-file-earmark-excel"></i> 匯出CSV
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="exportToExcel()" id="exportExcel" disabled>
+                        <i class="bi bi-file-earmark-spreadsheet"></i> 匯出Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 載入中覆蓋層 -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">載入中...</span>
+                </div>
+                <p class="mt-3" id="loadingMessage">正在載入資料，請稍候...</p>
+                <div class="progress mt-2" style="width: 300px;">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 查詢結果區域 -->
+        <div id="resultSection" style="display: none;">
+            <!-- 顯示警告 -->
+            <div id="displayWarning" class="alert alert-warning" style="display: none;">
+                <!-- 警告訊息將動態新增到這裡 -->
+            </div>
+            
+            <!-- 結果資訊 -->
+            <div class="result-info">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h6 class="mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            查詢結果
+                        </h6>
+                        <small id="resultCount">共找到 0 筆資料</small>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <small id="paginationInfo">第 1 頁，共 1 頁</small>
+                        <br>
+                        <small>資料來源：勞動部公告資料</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果表格 -->
+            <div class="table-container" id="resultTableContainer">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>序號</th>
+                                <th>事業單位名稱</th>
+                                <th>違法法規</th>
+                                <th>違反法規內容</th>
+                                <th>主管機關</th>
+                                <th>處分日期</th>
+                                <th>罰鍰金額</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody">
+                            <!-- 查詢結果將動態新增到這裡 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 分頁控制 -->
+            <div class="pagination-container">
+                <nav aria-label="查詢結果分頁">
+                    <ul class="pagination" id="pagination">
+                        <!-- 分頁按鈕將動態新增到這裡 -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+        <!-- 無結果提示 -->
+        <div id="noResultSection" class="text-center py-5" style="display: none;">
+            <i class="bi bi-search display-1 text-muted"></i>
+            <h4 class="text-muted mt-3">查無符合條件的資料</h4>
+            <p class="text-muted">請嘗試調整查詢條件</p>
+        </div>
+    </div>
+
+    <!-- 引入 Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 引入 XLSX 函式庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- 引入主要 JavaScript -->
+    <script src="labor-violation-query.js"></script>
+</body>
+</html>

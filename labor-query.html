@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>勞動部法規資料查詢系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .filter-group {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+        
+        .date-range {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="text-center mb-4">勞動部法規資料查詢系統</h1>
+        
+        <!-- 法規選擇區域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">選擇法規資料來源</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="lawType" id="laborLaw" value="a0101" checked>
+                            <label class="form-check-label" for="laborLaw">
+                                勞動基準法 (a0101)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="lawType" id="genderLaw" value="a0201">
+                            <label class="form-check-label" for="genderLaw">
+                                性別工作平等法 (a0201)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="lawType" id="minWageLaw" value="a0901">
+                            <label class="form-check-label" for="minWageLaw">
+                                最低工資法 (a0901)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 篩選條件區域 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">篩選條件</h5>
+            </div>
+            <div class="card-body">
+                <div id="filterContainer">
+                    <!-- 篩選條件將動態新增到這裡 -->
+                </div>
+                
+                <div class="d-flex justify-content-between mt-3">
+                    <button type="button" class="btn btn-primary" onclick="addFilterGroup()">
+                        <i class="bi bi-plus-circle"></i> 新增篩選條件
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="performSearch()">
+                        <i class="bi bi-search"></i> 搜尋
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 載入中提示 -->
+        <div id="loading" class="text-center loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">載入中...</span>
+            </div>
+            <p class="mt-2">正在載入資料，請稍候...</p>
+        </div>
+
+        <!-- 查詢結果區域 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">查詢結果</h5>
+                <small class="text-muted" id="resultInfo"></small>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover" id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>序號</th>
+                                <th>公告日期</th>
+                                <th>主旨</th>
+                                <th>內容</th>
+                                <th>附件</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultBody">
+                            <!-- 查詢結果將動態新增到這裡 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 勞動部資料來源配置
+        const LABOR_DATA_SOURCES = {
+            a0101: {
+                name: '勞動基準法',
+                url: 'https://announcement.mol.gov.tw/data/announcement_a0101.csv'
+            },
+            a0201: {
+                name: '性別工作平等法',
+                url: 'https://announcement.mol.gov.tw/data/announcement_a0201.csv'
+            },
+            a0901: {
+                name: '最低工資法',
+                url: 'https://announcement.mol.gov.tw/data/announcement_a0901.csv'
+            }
+        };
+
+        // 欄位定義
+        const FIELD_DEFINITIONS = {
+            announcement_date: { label: '公告日期', type: 'date' },
+            subject: { label: '主旨', type: 'text' },
+            content: { label: '內容', type: 'text' },
+            attachment: { label: '附件', type: 'text' }
+        };
+
+        // 全域變數
+        let currentData = [];
+        let filteredData = [];
+
+        // 初始化頁面
+        document.addEventListener('DOMContentLoaded', function() {
+            addFilterGroup();
+            loadData();
+        });
+
+        // 新增篩選條件群組
+        function addFilterGroup() {
+            const filterContainer = document.getElementById('filterContainer');
+            const filterGroup = document.createElement('div');
+            filterGroup.className = 'filter-group';
+            
+            filterGroup.innerHTML = `
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <select class="form-select field-select" onchange="updateOperators(this)">
+                            <option value="">請選擇欄位</option>
+                            ${Object.entries(FIELD_DEFINITIONS).map(([key, field]) => 
+                                `<option value="${key}">${field.label}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select operator-select" disabled>
+                            <option value="">請選擇運算符</option>
+                        </select>
+                    </div>
+                    <div class="col-auto value-container">
+                        <input type="text" class="form-control" disabled>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-danger" onclick="removeFilterGroup(this)">
+                            <i class="bi bi-trash"></i> 移除
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            filterContainer.appendChild(filterGroup);
+        }
+
+        // 移除篩選條件群組
+        function removeFilterGroup(button) {
+            button.closest('.filter-group').remove();
+        }
+
+        // 更新運算符選項
+        function updateOperators(select) {
+            const filterGroup = select.closest('.filter-group');
+            const operatorSelect = filterGroup.querySelector('.operator-select');
+            const valueContainer = filterGroup.querySelector('.value-container');
+            const fieldType = FIELD_DEFINITIONS[select.value]?.type || 'text';
+            
+            // 清空現有選項
+            operatorSelect.innerHTML = '<option value="">請選擇運算符</option>';
+            
+            // 根據欄位類型顯示對應的運算符
+            if (fieldType === 'date') {
+                const dateOperators = [
+                    { value: 'EQ', label: '等於' },
+                    { value: 'GR', label: '大於' },
+                    { value: 'GE', label: '大於等於' },
+                    { value: 'LT', label: '小於' },
+                    { value: 'LE', label: '小於等於' },
+                    { value: 'BETWEEN', label: '介於' }
+                ];
+                dateOperators.forEach(op => {
+                    const option = document.createElement('option');
+                    option.value = op.value;
+                    option.textContent = op.label;
+                    operatorSelect.appendChild(option);
+                });
+            } else {
+                const textOperators = [
+                    { value: 'EQ', label: '等於' },
+                    { value: 'CONTAINS', label: '包含' }
+                ];
+                textOperators.forEach(op => {
+                    const option = document.createElement('option');
+                    option.value = op.value;
+                    option.textContent = op.label;
+                    operatorSelect.appendChild(option);
+                });
+            }
+            
+            operatorSelect.removeAttribute('disabled');
+            
+            // 更新值輸入容器
+            updateValueContainer(select, valueContainer);
+        }
+
+        // 更新值輸入容器
+        function updateValueContainer(fieldSelect, valueContainer) {
+            const fieldType = FIELD_DEFINITIONS[fieldSelect.value]?.type || 'text';
+            const operatorSelect = fieldSelect.closest('.filter-group').querySelector('.operator-select');
+            const operator = operatorSelect.value;
+
+            valueContainer.innerHTML = '';
+
+            if (fieldType === 'date') {
+                if (operator === 'BETWEEN') {
+                    const rangeDiv = document.createElement('div');
+                    rangeDiv.className = 'date-range';
+
+                    const startInput = document.createElement('input');
+                    startInput.type = 'date';
+                    startInput.className = 'form-control date-range-start';
+
+                    const endInput = document.createElement('input');
+                    endInput.type = 'date';
+                    endInput.className = 'form-control date-range-end';
+
+                    rangeDiv.appendChild(startInput);
+                    rangeDiv.appendChild(document.createTextNode(' 至 '));
+                    rangeDiv.appendChild(endInput);
+
+                    valueContainer.appendChild(rangeDiv);
+                } else {
+                    const dateInput = document.createElement('input');
+                    dateInput.type = 'date';
+                    dateInput.className = 'form-control';
+                    valueContainer.appendChild(dateInput);
+                }
+            } else {
+                const textInput = document.createElement('input');
+                textInput.type = 'text';
+                textInput.className = 'form-control';
+                textInput.placeholder = '請輸入搜尋值';
+                valueContainer.appendChild(textInput);
+            }
+        }
+
+        // 載入資料
+        async function loadData() {
+            const selectedLaw = document.querySelector('input[name="lawType"]:checked').value;
+            const dataSource = LABOR_DATA_SOURCES[selectedLaw];
+            
+            showLoading();
+            
+            try {
+                const response = await fetch(dataSource.url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                currentData = parseCSV(csvText);
+                filteredData = [...currentData];
+                
+                updateResultTable();
+                updateResultInfo();
+                
+            } catch (error) {
+                console.error('載入資料失敗:', error);
+                alert('載入資料失敗，請稍後再試');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 解析CSV資料
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            
+            return lines.slice(1).filter(line => line.trim()).map((line, index) => {
+                const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+                const record = {
+                    id: index + 1
+                };
+                
+                headers.forEach((header, i) => {
+                    record[header] = values[i] || '';
+                });
+                
+                return record;
+            });
+        }
+
+        // 執行搜尋
+        function performSearch() {
+            const filters = [];
+            const filterGroups = document.querySelectorAll('.filter-group');
+            
+            filterGroups.forEach(group => {
+                const fieldSelect = group.querySelector('.field-select');
+                const operatorSelect = group.querySelector('.operator-select');
+                const valueContainer = group.querySelector('.value-container');
+                
+                const field = fieldSelect.value;
+                const operator = operatorSelect.value;
+                
+                if (field && operator) {
+                    const fieldType = FIELD_DEFINITIONS[field]?.type || 'text';
+                    
+                    if (fieldType === 'date') {
+                        if (operator === 'BETWEEN') {
+                            const startDate = valueContainer.querySelector('.date-range-start')?.value;
+                            const endDate = valueContainer.querySelector('.date-range-end')?.value;
+                            if (startDate && endDate) {
+                                filters.push({ field, operator, value: [startDate, endDate] });
+                            }
+                        } else {
+                            const dateInput = valueContainer.querySelector('input[type="date"]');
+                            if (dateInput?.value) {
+                                filters.push({ field, operator, value: dateInput.value });
+                            }
+                        }
+                    } else {
+                        const textInput = valueContainer.querySelector('input[type="text"]');
+                        if (textInput?.value) {
+                            filters.push({ field, operator, value: textInput.value });
+                        }
+                    }
+                }
+            });
+
+            // 套用篩選條件
+            filteredData = applyFilters(currentData, filters);
+            updateResultTable();
+            updateResultInfo();
+        }
+
+        // 套用篩選條件
+        function applyFilters(data, filters) {
+            if (filters.length === 0) {
+                return data;
+            }
+
+            return data.filter(record => {
+                return filters.every(filter => {
+                    const value = record[filter.field];
+                    
+                    switch (filter.operator) {
+                        case 'EQ':
+                            return value === filter.value;
+                        case 'CONTAINS':
+                            return value.toLowerCase().includes(filter.value.toLowerCase());
+                        case 'GR':
+                            return new Date(value) > new Date(filter.value);
+                        case 'GE':
+                            return new Date(value) >= new Date(filter.value);
+                        case 'LT':
+                            return new Date(value) < new Date(filter.value);
+                        case 'LE':
+                            return new Date(value) <= new Date(filter.value);
+                        case 'BETWEEN':
+                            const date = new Date(value);
+                            const startDate = new Date(filter.value[0]);
+                            const endDate = new Date(filter.value[1]);
+                            return date >= startDate && date <= endDate;
+                        default:
+                            return true;
+                    }
+                });
+            });
+        }
+
+        // 更新結果表格
+        function updateResultTable() {
+            const tbody = document.getElementById('resultBody');
+            tbody.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">無符合條件的資料</td></tr>';
+                return;
+            }
+
+            filteredData.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.id}</td>
+                    <td>${record.announcement_date || '-'}</td>
+                    <td>${record.subject || '-'}</td>
+                    <td>${record.content || '-'}</td>
+                    <td>${record.attachment || '-'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 更新結果資訊
+        function updateResultInfo() {
+            const resultInfo = document.getElementById('resultInfo');
+            resultInfo.textContent = `共找到 ${filteredData.length} 筆資料`;
+        }
+
+        // 顯示載入中
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        // 隱藏載入中
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // 監聽法規選擇變更
+        document.querySelectorAll('input[name="lawType"]').forEach(radio => {
+            radio.addEventListener('change', loadData);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>違反勞動法令事業單位（雇主）查詢系統 - Netlify 版本</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Netlify 版本特定樣式 */
+        .netlify-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00AD9F;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        .deployment-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .deployment-info h3 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        
+        .deployment-info p {
+            margin: 5px 0;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <!-- Netlify 部署標識 -->
+    <div class="netlify-badge">Netlify 部署</div>
+    
+    <div class="container">
+        <header>
+            <h1>違反勞動法令事業單位（雇主）查詢系統</h1>
+            <p>整合勞動基準法、性別工作平等法、最低工資法裁處資料</p>
+        </header>
+        
+        <!-- 部署資訊 -->
+        <div class="deployment-info">
+            <h3>📋 系統資訊</h3>
+            <p><strong>部署平台：</strong>Netlify (靜態網站託管)</p>
+            <p><strong>後端服務：</strong>Netlify Functions (Serverless)</p>
+            <p><strong>資料來源：</strong>勞動部公開資料</p>
+            <p><strong>更新頻率：</strong>資料快取1小時</p>
+        </div>
+        
+        <!-- 載入中提示 -->
+        <div id="loading" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <div id="loadingMessage">正在載入資料...</div>
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 查詢表單 -->
+        <div class="search-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="companyName">事業單位名稱：</label>
+                    <input type="text" id="companyName" placeholder="輸入事業單位名稱（支援模糊搜尋）">
+                </div>
+                
+                <div class="form-group">
+                    <label>裁處日期範圍：</label>
+                    <div class="date-range-container">
+                        <button type="button" onclick="toggleDateRange()" class="date-toggle-btn">
+                            <span id="dateRangeDisplay">最近一年</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div id="dateRangeSelector" class="date-selector" style="display: none;">
+                            <input type="date" id="startDate">
+                            <span>至</span>
+                            <input type="date" id="endDate">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="authorityFilter">主管機關：</label>
+                    <select id="authorityFilter">
+                        <option value="">全部主管機關</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="lawTypeFilter">法規類型：</label>
+                    <select id="lawTypeFilter">
+                        <option value="">全部法規</option>
+                        <option value="勞動基準法">勞動基準法</option>
+                        <option value="性別工作平等法">性別工作平等法</option>
+                        <option value="最低工資法">最低工資法</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" onclick="performSearch()" class="search-btn">搜尋</button>
+                <button type="button" onclick="resetQuery()" class="reset-btn">重置</button>
+            </div>
+        </div>
+        
+        <!-- 查詢結果 -->
+        <div id="searchResults" class="search-results" style="display: none;">
+            <div class="results-header">
+                <div id="resultCount" class="result-count">查詢結果：共 0 筆資料</div>
+                <div class="results-actions">
+                    <label for="pageSize">每頁顯示：</label>
+                    <select id="pageSize" onchange="handlePageSizeChange()">
+                        <option value="20">20 筆</option>
+                        <option value="50" selected>50 筆</option>
+                        <option value="100">100 筆</option>
+                        <option value="200">200 筆</option>
+                    </select>
+                    <button onclick="exportToCSV()" class="export-btn">匯出 CSV</button>
+                    <button onclick="exportToExcel()" class="export-btn">匯出 Excel</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="result-table">
+                    <thead>
+                        <tr>
+                            <th>序號</th>
+                            <th>事業單位名稱</th>
+                            <th>裁處日期</th>
+                            <th>主管機關</th>
+                            <th>法規類型</th>
+                            <th>違反法規</th>
+                            <th>罰鍰金額</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTable">
+                        <!-- 動態生成表格內容 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="paginationContainer" class="pagination-container">
+                <!-- 動態生成分頁 -->
+            </div>
+        </div>
+        
+        <!-- 系統說明 -->
+        <div class="system-info">
+            <h3>📖 系統說明</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <h4>資料來源</h4>
+                    <p>本系統整合勞動部公告的違反勞動法令事業單位裁處資料，包含：</p>
+                    <ul>
+                        <li>勞動基準法裁處資料</li>
+                        <li>性別工作平等法裁處資料</li>
+                        <li>最低工資法裁處資料</li>
+                    </ul>
+                </div>
+                
+                <div class="info-item">
+                    <h4>查詢功能</h4>
+                    <p>支援多條件查詢：</p>
+                    <ul>
+                        <li>事業單位名稱模糊搜尋</li>
+                        <li>裁處日期範圍篩選</li>
+                        <li>主管機關篩選</li>
+                        <li>法規類型篩選</li>
+                    </ul>
+                </div>
+                
+                <div class="info-item">
+                    <h4>匯出功能</h4>
+                    <p>查詢結果可匯出為：</p>
+                    <ul>
+                        <li>CSV 格式檔案</li>
+                        <li>Excel 格式檔案</li>
+                    </ul>
+                </div>
+                
+                <div class="info-item">
+                    <h4>技術特色</h4>
+                    <p>採用現代化技術：</p>
+                    <ul>
+                        <li>Serverless 架構</li>
+                        <li>靜態網站託管</li>
+                        <li>自動快取機制</li>
+                        <li>響應式設計</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2024 勞動法令查詢系統 - Netlify 版本</p>
+            <p>資料來源：<a href="https://announcement.mol.gov.tw/" target="_blank">勞動部公告資訊</a></p>
+        </footer>
+    </div>
+    
+    <script src="labor-violation-query-netlify.js"></script>
+</body>
+</html> 
