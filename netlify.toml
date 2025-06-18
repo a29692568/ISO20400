@@ -1,54 +1,129 @@
+# Netlify 配置檔案 - 勞動法令查詢系統
+# 此檔案控制 Netlify 的建置、部署和路由行為
+
 [build]
-  # 發布目錄
+  # 發布目錄：指定要部署到 Netlify 的檔案目錄
+  # "." 表示當前目錄（專案根目錄）
+  # 這裡包含所有靜態檔案：HTML、CSS、JS、圖片等
   publish = "."
   
-  # Functions 目錄
+  # Functions 目錄：指定 Netlify Functions 的位置
+  # Netlify Functions 是 Serverless 函數，用於處理後端邏輯
+  # 這裡存放我們的資料代理和健康檢查函數
   functions = "netlify-functions"
 
 [build.environment]
-  # Node.js 版本
+  # 建置環境變數
+  # NODE_VERSION：指定 Node.js 版本，確保 Functions 使用正確的 Node.js 版本
+  # 建議使用 LTS 版本（如 18.x）以確保穩定性和相容性
   NODE_VERSION = "18"
 
-# 路由規則
+# =============================================================================
+# 路由規則 (Redirects)
+# 控制 URL 路由和重定向行為
+# =============================================================================
+
 [[redirects]]
-  # 將 /api/labor-data/* 路由到 Functions
-  from = "/api/labor-data/*"
-  to = "/.netlify/functions/proxy-labor-data"
+  # API 路由：將 /api/labor-data/* 的請求路由到我們的資料代理 Function
+  # 例如：/api/labor-data/a0101 → /.netlify/functions/proxy-labor-data
+  from = "/api/labor-data/*"  # 匹配的 URL 模式
+  to = "/.netlify/functions/proxy-labor-data"  # 目標 Function
+  status = 200  # HTTP 狀態碼（200 表示正常重定向）
+
+[[redirects]]
+  # 健康檢查端點：提供系統狀態檢查
+  # 用於監控服務是否正常運行
+  from = "/api/health"  # 健康檢查 URL
+  to = "/.netlify/functions/health-check"  # 健康檢查 Function
   status = 200
 
-# 健康檢查端點
 [[redirects]]
-  from = "/api/health"
-  to = "/.netlify/functions/health-check"
+  # SPA (Single Page Application) 路由處理
+  # 確保所有前端路由都能正確載入 index.html
+  # 這對於 React、Vue 等 SPA 框架很重要
+  from = "/*"  # 匹配所有路徑
+  to = "/index.html"  # 都導向主頁面
   status = 200
 
-# 處理 SPA 路由
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# =============================================================================
+# 安全性標頭 (Security Headers)
+# 增強網站安全性，防止常見攻擊
+# =============================================================================
 
-# 安全性標頭
 [[headers]]
-  for = "/*"
+  # 全域安全性標頭：適用於所有頁面
+  for = "/*"  # 匹配所有路徑
   [headers.values]
+    # 防止網站被嵌入 iframe（防止點擊劫持攻擊）
     X-Frame-Options = "DENY"
+    
+    # 啟用瀏覽器 XSS 防護
     X-XSS-Protection = "1; mode=block"
+    
+    # 防止 MIME 類型嗅探攻擊
     X-Content-Type-Options = "nosniff"
+    
+    # 控制 Referrer 資訊傳送，保護隱私
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# 快取設定
-[[headers]]
-  for = "/api/labor-data/*"
-  [headers.values]
-    Cache-Control = "public, max-age=3600"
+# =============================================================================
+# 快取策略 (Caching Strategy)
+# 優化載入速度，減少伺服器負載
+# =============================================================================
 
 [[headers]]
-  for = "*.js"
+  # API 資料快取：勞動部資料快取 1 小時
+  # 平衡資料新鮮度和載入速度
+  for = "/api/labor-data/*"  # 匹配 API 路徑
   [headers.values]
-    Cache-Control = "public, max-age=31536000"
+    Cache-Control = "public, max-age=3600"  # 公開快取，1小時過期
 
 [[headers]]
-  for = "*.css"
+  # JavaScript 檔案快取：長期快取（1年）
+  # JS 檔案通常不會頻繁變更，可以長期快取
+  for = "*.js"  # 匹配所有 .js 檔案
   [headers.values]
-    Cache-Control = "public, max-age=31536000" 
+    Cache-Control = "public, max-age=31536000"  # 1年 = 365天 * 24小時 * 60分鐘 * 60秒
+
+[[headers]]
+  # CSS 檔案快取：長期快取（1年）
+  # CSS 檔案也適合長期快取
+  for = "*.css"  # 匹配所有 .css 檔案
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"  # 1年快取
+
+# =============================================================================
+# 可選配置（根據需要啟用）
+# =============================================================================
+
+# 自訂域名配置（如果需要）
+# [[redirects]]
+#   from = "https://your-domain.com/*"
+#   to = "https://your-netlify-site.netlify.app/:splat"
+#   status = 301
+
+# 環境變數配置（敏感資訊）
+# [context.production.environment]
+#   API_KEY = "your-production-api-key"
+# 
+# [context.deploy-preview.environment]
+#   API_KEY = "your-preview-api-key"
+
+# 建置命令配置（如果需要）
+# [build]
+#   command = "npm run build"  # 執行建置命令
+#   publish = "dist"           # 建置後的目錄
+
+# 表單處理配置（如果需要表單功能）
+# [[redirects]]
+#   from = "/submit"
+#   to = "/.netlify/functions/submit-form"
+#   status = 200
+
+# 圖片優化配置
+# [build.processing]
+#   skip_processing = false
+# 
+# [build.processing.images]
+#   compress = true
+#   quality = 85 
